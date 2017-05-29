@@ -40,12 +40,12 @@ def test_nondefault_fourier_mask():
 
 def test_reconstruction_multiwavelength():
     wl = [450e-9, 550e-9, 650e-9]
-    im = np.dstack([_example_hologram() for _ in wl])
+    im = _example_hologram()
     holo = Hologram(im, wavelength = wl)
 
     w = holo.reconstruct(0.2)
     assert np.allclose(wl, holo.wavelength)
-    assert im.shape == w.reconstructed_wave.shape
+    assert len(wl) == w.reconstructed_wave.shape[2]
 
     # in some rare occations, it has appeared that the
     # reconstructed waves were all NaNs.
@@ -59,19 +59,25 @@ def _gaussian2d(amplitude, width, centroid, dim):
 
 
 def test_centroid():
-    centroid = (265, 435)
-    test_image = _gaussian2d(amplitude=10, width=5, centroid=centroid, dim=1024)
-    assert np.all(np.squeeze(_find_peak_centroid(image=test_image)) == centroid)
-    assert np.all(test_image[centroid] == np.max(test_image))
+    centroid = np.array([(308, 308), (512,512), (716,716)])
+    amp = np.array([10, 20, 10])
+    test_image = np.zeros([1024,1024])
+    for c in range(len(centroid)):
+        test_image = test_image + _gaussian2d(amplitude=amp[c], width=5, centroid=centroid[c], dim=1024)
+    assert np.all(np.squeeze(_find_peak_centroid(image=test_image)) == centroid.swapaxes(0,1)[:,2])
+    assert np.any(test_image[centroid] == np.max(test_image))
 
 def test_centroid_multichannel():
     """ Test _find_peak_centroid for inputs with multiple channels (wavelengths) """
-    centroids = (102, 304), (405, 312)
-    test_image = np.dstack([_gaussian2d(amplitude=20, width=4, centroid=centroids[0], dim=512),
-                            _gaussian2d(amplitude=10, width=7, centroid=centroids[1], dim=512)])
-    computed_centroids = np.squeeze(_find_peak_centroid(image=test_image))
-    assert np.all(computed_centroids[:,0] == centroids[0])
-    assert np.all(computed_centroids[:,1] == centroids[1])
+    wl = [450e-9, 550e-9, 650e-9]
+    centroid = np.array([(308, 308), (512,512), (624,224), (824,424), (716,716), (400,800), (200,600)])
+    amp = np.array([10, 8, 6, 20, 6, 8, 10])
+    test_image = np.zeros([1024,1024])
+    for c in range(len(centroid)):
+        test_image = test_image + _gaussian2d(amplitude=amp[c], width=5, centroid=centroid[c], dim=1024)
+
+    assert np.all(np.squeeze(_find_peak_centroid(image=test_image,wavelength=wl)) == centroid[4:])
+    assert np.any(test_image[centroid] == np.max(test_image))
 
 def test_crop_image():
     # Even number rows/cols
