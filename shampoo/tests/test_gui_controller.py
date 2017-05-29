@@ -48,8 +48,7 @@ def test_qreconstructor_hologram_three_wavelength():
 	reconstructor.reconstructed_signal.connect(reconstructed.append)
 	reconstructor.reconstructed_signal.connect(lambda x: quit_timer.start(1))
 
-	h = Hologram(np.dstack([_example_hologram() for _ in range(3)]), 
-					wavelength = [405e-9, 488e-9, 532e-9])
+	h = Hologram(_example_hologram(), wavelength = [405e-9, 488e-9, 532e-9])
 	reconstructor.reconstruct(h, {'propagation_distance': 0.03})
 	app.exec_() # Wait here until app.exit is called
 

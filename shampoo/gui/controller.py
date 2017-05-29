@@ -124,7 +124,6 @@ class ShampooController(QtCore.QObject):
         data : Hologram object or TimeSeries
             Can be any type that can is accepted by the Hologram() constructor.
         """
-        print('controller:reconstruct')
         self.raw_data_signal.emit(data)
         self.to_be_reconstructed[object, dict].emit(data, params)
     
@@ -225,7 +224,6 @@ class QReconstructor(QtCore.QObject):
         self.reconstruction_status.emit('Reconstruction in progress...')
         reconstructed_wave = hologram.reconstruct(**self.reconstruction_parameters, **params)
         self.reconstructed_signal.emit(reconstructed_wave)
-        print('qreconstructor:reconstruct')
         self.reconstruction_status.emit('Reconstruction complete.')
     
     @QtCore.pyqtSlot(dict)

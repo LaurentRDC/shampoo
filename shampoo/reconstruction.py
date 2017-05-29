@@ -221,19 +221,10 @@ class MaskSizeWarning(AstropyUserWarning):
     pass
     
 class UpdateError(Exception):
-    def __init__(self, value):
-        self.value = value
-        
-    def __str__(self):
-        return repr(self.value)
+    pass
         
 class SizeError(Exception):
-    def __init__(self, value):
-        self.value = value
-        
-    def __str__(self):
-        return repr(self.value)
-
+    pass
 
 class Hologram(object):
     """
@@ -334,7 +325,6 @@ class Hologram(object):
             Path to the hologram to load
         """
         hologram = _load_hologram(hologram_path)
-
         return cls(hologram, **kwargs)
         
     def reconstruct(self, propagation_distance, spectral_peak=None, fourier_mask=None, chromatic_shift=None):
@@ -351,9 +341,13 @@ class Hologram(object):
         fourier_mask : array_like or None, optional
             Fourier-domain mask. If None (default), a mask is determined from the position of the
             main spectral peak. If array_like, the array will be cast to boolean.
+
         Returns
         -------
-        reconstructed : ReconstructedWave
+        reconstructed : ReconstructedWave or iterable
+            For a single propagation distance, the output is a ReconstructedWave. For multiple
+            propagation distances, `reconstructed` is a dictionary whose keys are propagation distances,
+            and each value is a ReconstructedWave object
         """
 
         propagation_distance = np.atleast_1d(propagation_distance)
@@ -374,8 +368,7 @@ class Hologram(object):
             warnings.warn(message, MaskSizeWarning)
         
         if propagation_distance.size > 1:
-            reconstructed_wave = self._reconstruct_multithread(propagation_distance, 
-                                                               fourier_mask = fourier_mask)
+            reconstructed_wave = self._reconstruct_multithread(propagation_distance, fourier_mask = fourier_mask)
         else:
             reconstructed_wave = self._reconstruct(propagation_distance, fourier_mask)
         
@@ -395,6 +388,7 @@ class Hologram(object):
         fourier_mask : array_like or None, optional
             Fourier-domain mask. If None (default), a mask is determined from the position of the
             main spectral peak.
+
         Returns
         -------
         reconstructed_wave : `~shampoo.reconstruction.ReconstructedWave`
