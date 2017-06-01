@@ -56,9 +56,6 @@ class ShampooController(QtCore.QObject):
     # Time series metadata
     time_series_metadata_signal = QtCore.pyqtSignal(dict)
 
-    # Camera signals
-    camera_connected_signal = QtCore.pyqtSignal(bool)
-
     error_message_signal = QtCore.pyqtSignal(str)
 
     def __init__(self, **kwargs):
@@ -68,9 +65,6 @@ class ShampooController(QtCore.QObject):
 
         self.propagation_distance = list()
         self.fourier_mask = None
-        
-        self.camera = None
-        self.camera_connected_signal.emit(False)
         
         self._reconstruction_thread = QtCore.QThread()
         self.reconstructor = QReconstructor()
@@ -85,6 +79,9 @@ class ShampooController(QtCore.QObject):
         # Propagation of signals across reconstructor and controller
         self.reconstructor.reconstructed_signal.connect(self.reconstructed_hologram_signal)
         self.reconstructor.reconstruction_status.connect(self.reconstruction_status_signal)
+    
+    def __del__(self):
+        self._reconstruction_thread.quit()
 
     @error_aware('Time series could not be loaded')
     @QtCore.pyqtSlot(str)
@@ -104,14 +101,6 @@ class ShampooController(QtCore.QObject):
         metadata = dict(self.time_series.attrs)
         metadata.update({'filename': path})
         self.time_series_metadata_signal.emit(metadata)
-
-    @QtCore.pyqtSlot()
-    def send_snapshot_data(self):
-        """
-        Send holographic data from the camera to the reconstruction reactor.
-        """
-        data = self.camera.snapshot()
-        self.send_data(data)
 
     @QtCore.pyqtSlot(object)
     @QtCore.pyqtSlot(object, dict)
@@ -133,18 +122,6 @@ class ShampooController(QtCore.QObject):
         """ Display raw data and reconstruction from TimeSeries """
         self.reconstruct(self.time_series, {'time_point': time_point})
     
-    @error_aware('Latest hologram could not be saved.')
-    @QtCore.pyqtSlot(object)
-    def save_latest_hologram(self, path):
-        """
-        Save latest raw holographic data into a HDF5
-
-        Parameters
-        ----------
-        path : str or path-like object
-        """
-        imsave(path, arr = self._latest_hologram.hologram, plugin = 'tifffile')
-    
     @error_aware('Fourier mask could not be set.')
     @QtCore.pyqtSlot(object)
     def set_fourier_mask(self, mask):
@@ -162,46 +139,6 @@ class ShampooController(QtCore.QObject):
             Propagation distances in meters.
         """
         self.reconstruction_parameters_signal.emit({'propagation_distance': item})
-    
-    @error_aware('Camera features could not be updated.')
-    @QtCore.pyqtSlot(dict)
-    def update_camera_features(self, feature_dict):
-        """ 
-        Update camera features (e.g. exposure, bit depth) according to a dictionary.
-        
-        Parameters
-        ----------
-        feature_dict : dict
-        """
-        if not self.camera:
-            return
-        
-        for feature, value in feature_dict.items():
-            setattr(self.camera, feature, value)
-    
-    @error_aware('Camera could not be connected.')
-    @QtCore.pyqtSlot(object)
-    def connect_camera(self, ID):
-        """ 
-        Connect camera by ID. 
-        
-        Parameters
-        ----------
-        ID : str
-            String identifier to a camera. If 'debug', a dummy DebugCamera
-            instance will be connected.
-        """
-        # TODO: generalize to other manufacturers
-        # This method should never fail. available_cameras() must have been called
-        # before so that connecting is always successful.
-        if ID == 'debug':
-            self.camera = DebugCamera()
-        else:
-            self.camera = AlliedVisionCamera(ID)
-        self.camera_connected_signal.emit(True)
-    
-    def stop(self):
-        pass
 
 class QReconstructor(QtCore.QObject):
     """ QObject responsible for reconstructing holograms """
