@@ -111,7 +111,7 @@ setup(name=PACKAGENAME,
           plotting=['matplotlib'],
           docs=['sphinx_rtd_theme']
       ),
-      install_requires=['numpy', 'scipy', 'astropy', 'scikit-image',
+      install_requires=['numpy', 'scipy', 'astropy', 'scikit-image', 'PyQt5',
                         'matplotlib', 'scikit-learn', 'pyqtgraph', 'h5py'],
       author=AUTHOR,
       author_email=AUTHOR_EMAIL,

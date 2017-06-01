@@ -333,8 +333,8 @@ class Hologram(object):
         
         Parameters
         ----------
-        propagation_distances : `~numpy.ndarray` or list
-            Propagation distances to reconstruct
+        propagation_distances : float or iterable of float
+            Propagation distance(s) to reconstruct
         spectral_peak : `~numpy.ndarray`
             Centroid of spectral peak for wavelength in power spectrum of hologram FT
             (len(self.wavelength) x 2)

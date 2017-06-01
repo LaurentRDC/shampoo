@@ -44,7 +44,7 @@ class HologramViewer(QtGui.QWidget):
         ----------
         data : Hologram
         """
-        self.raw_data_viewer.setImage(data.hologram)
+        self.raw_data_viewer.setImage(np.squeeze(data.hologram))
 
-        ft = fftshift(fft2(data.hologram, axes = (0, 1)), axes = (0, 1))
+        ft = fftshift(fft2(np.squeeze(data.hologram), axes = (0, 1)), axes = (0, 1))
         self.fourier_plane_viewer.setImage(ft.real)

@@ -120,7 +120,8 @@ class ShampooController(QtCore.QObject):
     @QtCore.pyqtSlot(float)
     def data_from_time_series(self, time_point):
         """ Display raw data and reconstruction from TimeSeries """
-        self.reconstruct(self.time_series, {'time_point': time_point})
+        self.raw_data_signal.emit(self.time_series.hologram(time_point))
+        #self.reconstruct(self.time_series, {'time_point': time_point})
     
     @error_aware('Fourier mask could not be set.')
     @QtCore.pyqtSlot(object)

@@ -194,7 +194,6 @@ class App(QtGui.QMainWindow):
 
         if reply == QtGui.QMessageBox.Yes:
             event.accept()
-            self.controller.stop()
         else:
             event.ignore()
     
