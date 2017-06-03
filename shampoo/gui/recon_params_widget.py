@@ -64,7 +64,11 @@ class ReconstructionParametersWidget(QtGui.QWidget):
         mode_btns.addWidget(single_prop_dist_btn)
         mode_btns.addWidget(multi_prop_dist_btn)
 
+        title_label = QtGui.QLabel('<h3>Numerical Propagation Distance(s)</h3>')
+        title_label.setAlignment(QtCore.Qt.AlignCenter)
+
         layout = QtGui.QVBoxLayout()
+        layout.addWidget(title_label)
         layout.addLayout(prop_dist_layout)
         layout.addLayout(mode_btns)
         self.setLayout(layout)

@@ -12,22 +12,6 @@ from ..reconstruction import Hologram, ReconstructedWave
 ICONS_FOLDER = os.path.join(os.path.dirname(__file__), 'icons')
 DEFAULT_PROPAGATION_DISTANCE = 0.03658
 
-#########################################################################################
-###             GUI COMPONENTS
-
-class ShampooStatusBar(QtGui.QStatusBar):
-    """
-    QStatusBar subclass with a simplied API to update the status.
-    """
-    def __init__(self, *args, **kwargs):
-        super(ShampooStatusBar, self).__init__(*args, **kwargs)
-        self.status_label = QtGui.QLabel()
-        self.addPermanentWidget(self.status_label)
-    
-    @QtCore.pyqtSlot(str)
-    def update_status(self, message):
-        self.status_label.setText(message)
-
 class TimeSeriesControls(QtGui.QWidget):
     """ Control of TimeSeries, as well as some metadata """
     
@@ -58,15 +42,13 @@ class TimeSeriesControls(QtGui.QWidget):
         controls.addWidget(self.time_point_label)
         controls.addWidget(self.time_point_slider)
 
-        title = QtGui.QLabel('Time-series controls')
+        title = QtGui.QLabel('<h3>Time-series controls</h3>')
         title.setAlignment(QtCore.Qt.AlignCenter)
         layout = QtGui.QVBoxLayout()
         layout.addWidget(title)
         layout.addWidget(self.filename_label)
         layout.addLayout(controls)
         self.setLayout(layout)
-
-        self.hide()
     
     @QtCore.pyqtSlot(dict)
     def update_metadata(self, metadata):
@@ -84,70 +66,6 @@ class TimeSeriesControls(QtGui.QWidget):
     @QtCore.pyqtSlot(int)
     def _update(self, index):
         self.time_point_request_signal.emit(self.time_points[index])
-
-
-class CameraFeatureDialog(QtGui.QDialog):
-    """
-    Modal dialog used to set camera features within SHAMPOO
-    """
-    camera_features_update_signal = QtCore.pyqtSignal(dict, name = 'camera_features_update_signal')
-
-    def __init__(self, camera, parent = None):
-        """
-        Parameters
-        ----------
-        camera : shampoo.gui.Camera instance
-
-        parent : QWidget or None, optional
-        """
-        self.camera = camera
-        super(CameraFeatureDialog, self).__init__()
-
-        self.setModal(True)
-        self.save_btn = QtGui.QPushButton('Update values', self)
-        self.save_btn.clicked.connect(self.accept)
-
-        self.cancel_btn = QtGui.QPushButton('Cancel changes', self)
-        self.cancel_btn.clicked.connect(self.reject)
-        self.cancel_btn.setDefault(True)
-
-        # Order in which features are enumerated must be the same as ordered in self.camera.features
-        # The order is assumed here
-        feature_labels = [QtGui.QLabel(label) for label in ('Exposure (us)', 'Resolution (px, px)', 'Bit depth')]
-        self.exposure_edit = QtGui.QLineEdit(str(self.camera.exposure), parent = self)
-        self.resolution_edit = QtGui.QLineEdit(str(self.camera.resolution), parent = self)
-        self.bit_depth_edit = QtGui.QLineEdit(str(self.camera.bit_depth), parent = self) 
-        feature_edit = [self.exposure_edit, self.resolution_edit, self.bit_depth_edit]
-
-        #Set access mode
-        # TODO: set automatically?
-        self.resolution_edit.setReadOnly(True)
-        self.bit_depth_edit.setReadOnly(True)
-
-        self.labels_layout = QtGui.QVBoxLayout()
-        self.values_layout = QtGui.QVBoxLayout()
-        for label, edit in zip( feature_labels, feature_edit ):
-            self.labels_layout.addWidget(label)
-            self.values_layout.addWidget(edit)
-
-        self.buttons = QtGui.QHBoxLayout()
-        self.buttons.addWidget(self.save_btn)
-        self.buttons.addWidget(self.cancel_btn)
-        
-        self.list_layout = QtGui.QHBoxLayout()
-        self.list_layout.addLayout(self.labels_layout)
-        self.list_layout.addLayout(self.values_layout)
-
-        self.layout = QtGui.QVBoxLayout()
-        self.layout.addLayout(self.list_layout)
-        self.layout.addLayout(self.buttons)
-        self.setLayout(self.layout)
-    
-    @QtCore.pyqtSlot()
-    def accept(self):
-        feature_dict = {'exposure': int(self.exposure_edit.text()), 'bit_depth': int(self.bit_depth_edit.text())}
-        self.camera_features_update_signal.emit(feature_dict)
-        super(CameraFeatureDialog, self).accept()
 
 class ReconstructedHologramViewer(QtGui.QWidget):
     """

@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 from pyqtgraph import QtGui, QtCore, ImageView
 
+from .recon_params_widget import ReconstructionParametersWidget
 from .. import TimeSeries
 
 class TimeSeriesReconstructionDialog(QtGui.QDialog):
@@ -14,6 +15,7 @@ class TimeSeriesReconstructionDialog(QtGui.QDialog):
         super(TimeSeriesReconstructionDialog, self).__init__(**kwargs)
 
         self.time_series = None
+        self._propagation_distances = None
 
         self.setModal(True)
         self.setWindowTitle('Reconstruct time-series')
@@ -36,13 +38,28 @@ class TimeSeriesReconstructionDialog(QtGui.QDialog):
         self._reconstruction_update_signal.connect(self.reconstruction_progress.setValue)
         self.reconstruction_progress.hide()
 
+        self.recons_params_widget = ReconstructionParametersWidget(parent = self)
+        self.recons_params_widget.propagation_distance_signal.connect(self.update_propagation_distance)
+
         load_time_series_btn = QtGui.QPushButton('Load time-series', self)
         load_time_series_btn.clicked.connect(self.load_time_series)
 
+        accept_btn = QtGui.QPushButton('Reconstruct time-series', self)
+        accept_btn.clicked.connect(self.accept)
+
+        cancel_btn = QtGui.QPushButton('Cancel', self)
+        cancel_btn.clicked.connect(self.reject)
+
+        btns = QtGui.QHBoxLayout()
+        btns.addWidget(accept_btn)
+        btns.addWidget(cancel_btn)
+
         layout = QtGui.QVBoxLayout()
+        layout.addWidget(load_time_series_btn)
         layout.addWidget(self.holograms_viewer)
         layout.addLayout(labeled_slider)
-        layout.addWidget(load_time_series_btn)
+        layout.addWidget(self.recons_params_widget)
+        layout.addLayout(btns)
         self.setLayout(layout)
 
     @QtCore.pyqtSlot()
@@ -68,9 +85,14 @@ class TimeSeriesReconstructionDialog(QtGui.QDialog):
         hologram = self.time_series.hologram(time_point)
         self.holograms_viewer.setImage(hologram.hologram)
     
+    @QtCore.pyqtSlot(object)
+    def update_propagation_distance(self, dist):
+        """ Store the reconstruction parameters """
+        self._propagation_distances = dist
+    
     @QtCore.pyqtSlot()
     def accept(self):
-        raise NotImplementedError
-        self.time_series.batch_reconstruct(propagation_distance = range(0,10), 
-                                           fourier_mask = fourier_mask, 
+        self.time_series.batch_reconstruct(propagation_distance = self._propagation_distances, 
+                                           fourier_mask = None, 
                                            callback = self._reconstruction_update_signal.emit)
+        super().accept()

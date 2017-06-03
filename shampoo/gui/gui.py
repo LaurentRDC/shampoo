@@ -3,6 +3,7 @@ Graphical User Interface to the SHAMPOO API.
 """
 from __future__ import absolute_import
 
+from contextlib import suppress
 import functools
 import os.path
 import sys
@@ -17,27 +18,61 @@ from skimage.io import imsave
 from . import error_aware
 from ..reconstruction import Hologram, ReconstructedWave
 from ..time_series import TimeSeries
-from .controller import ShampooController
 from .fourier_mask_dialog import FourierMaskDialog
 from .hologram_viewer import HologramViewer
 from .recon_params_widget import ReconstructionParametersWidget
 from .time_series_creator import TimeSeriesCreator
 from .time_series_reconstruction_dialog import TimeSeriesReconstructionDialog
-from .widgets import (ReconstructedHologramViewer,
-                      ShampooStatusBar, TimeSeriesControls)
+from .widgets import ReconstructedHologramViewer, TimeSeriesControls
 
-def run(debug = False):
-    """
-    
-    """
+def run(*args, **kwargs):
     app = QtGui.QApplication(sys.argv)
     app.setStyle(QtGui.QStyleFactory.create('cde'))
-    try:
-        gui = App(debug = debug)
-        sys.exit(app.exec_())
-    finally:
-        # Reactor might hang due to an exception
-        del app
+    gui = App()
+    sys.exit(app.exec_())
+
+class ShampooController(QtCore.QObject):
+    """
+    Underlying controller to SHAMPOO's Graphical User Interface
+    """
+    raw_data_signal = QtCore.pyqtSignal(object)
+    reconstructed_hologram_signal = QtCore.pyqtSignal(object)
+    time_series_metadata_signal = QtCore.pyqtSignal(dict)
+    error_message_signal = QtCore.pyqtSignal(str)
+
+    def __init__(self, **kwargs):
+        super(ShampooController, self).__init__(**kwargs)
+        self.time_series = None
+    
+    @QtCore.pyqtSlot(str)
+    @error_aware('Time-series could not be loaded')
+    def load_time_series(self, path):
+        """
+        Load TimeSeries object into the controller
+
+        Parameters
+        ----------
+        path : str
+            Path to the HDF5 file
+        """
+        if self.time_series is not None:
+            self.time_series.close()
+        
+        self.time_series = TimeSeries(path, mode = 'r+')
+        metadata = dict(self.time_series.attrs)
+        metadata.update({'filename': path})
+        self.time_series_metadata_signal.emit(metadata)
+
+        self.data_from_time_series(metadata['time_points'][0])
+    
+    @QtCore.pyqtSlot(float)
+    def data_from_time_series(self, time_point):
+        """ Display raw data and reconstruction from TimeSeries """
+        self.raw_data_signal.emit(self.time_series.hologram(time_point))
+
+        with suppress(ValueError):
+            reconstructed = self.time_series.reconstructed_wave(time_point)
+            self.reconstructed_hologram_signal.emit(reconstructed)
 
 class App(QtGui.QMainWindow):
     """
@@ -58,26 +93,31 @@ class App(QtGui.QMainWindow):
 
     error_message_signal = QtCore.pyqtSignal(str, name = 'error_message_signal')
     
-    def __init__(self, debug = False):
+    def __init__(self, **kwargs):
         """
         Parameters
         ----------
         debug : bool, optional
             If True, extra options are available as a debug tool. Default is False.
         """
-        super(App, self).__init__()
+        super(App, self).__init__(**kwargs)
 
-        # TODO: controller in its own thread
+        self._controller_thread = QtCore.QThread()
         self.controller = ShampooController()
-        self.debug = debug
+        self.controller.moveToThread(self._controller_thread)
+        self._controller_thread.start()
 
         self.data_viewer = HologramViewer(parent = self)
         self.reconstructed_viewer = ReconstructedHologramViewer(parent = self)
-        self.reconstruction_parameters_widget = ReconstructionParametersWidget(parent = self)
 
         self.time_series_controls = TimeSeriesControls(parent = self)
+        self.time_series_controls.hide()
+        self.controller.time_series_metadata_signal.connect(lambda d: self.time_series_controls.show())
         self.controller.time_series_metadata_signal.connect(self.time_series_controls.update_metadata)
         self.time_series_controls.time_point_request_signal.connect(self.controller.data_from_time_series)
+
+        self.controller.reconstructed_hologram_signal.connect(self.reconstructed_viewer.display)
+        self.controller.raw_data_signal.connect(self.data_viewer.display)
 
         self.file_dialog = QtGui.QFileDialog(parent = self)
         self.menubar = self.menuBar()
@@ -91,11 +131,6 @@ class App(QtGui.QMainWindow):
 
         reconstructed_layout = QtGui.QVBoxLayout()
         reconstructed_layout.addWidget(self.reconstructed_viewer)
-        reconstructed_layout.addWidget(self.reconstruction_parameters_widget)
-
-        self.status_bar = ShampooStatusBar(parent = self)
-        self.setStatusBar(self.status_bar)
-        self.status_bar.update_status('Ready')
 
         self.error_window = QtGui.QErrorMessage(parent = self)
         self.error_message_signal.connect(self.error_window.showMessage)
@@ -127,37 +162,6 @@ class App(QtGui.QMainWindow):
         self.time_series_reconstruct_action = QtGui.QAction('&Reconstruct a hologram time-series', self)
         self.time_series_reconstruct_action.triggered.connect(self.launch_time_series_reconstruction)
         self.file_menu.addAction(self.time_series_reconstruct_action)
-
-        self.file_menu.addSeparator()
-
-        self.load_fourier_mask_action = QtGui.QAction('&Load Fourier mask', self)
-        self.load_fourier_mask_action.triggered.connect(self.load_fourier_mask)
-        self.file_menu.addAction(self.load_fourier_mask_action)
-
-        self.reconstruction_parameters_widget.propagation_distance_signal.connect(self.controller.update_propagation_distance)
-        self.controller.reconstructed_hologram_signal.connect(self.reconstructed_viewer.display)
-        self.controller.raw_data_signal.connect(self.data_viewer.display)
-
-        # Controller status signals
-        self.controller.reconstruction_status_signal.connect(self.status_bar.update_status)
-
-        self.reconstruction_parameters_widget.update_propagation_distance()
-
-    @error_aware('Data could not be loaded.')
-    @QtCore.pyqtSlot()
-    def load_data(self):
-        """ Load a hologram into memory and displays it. """
-        path = self.file_dialog.getOpenFileName(self, 'Load holographic data', filter = '*tif')[0]
-        hologram = Hologram.from_tif(os.path.abspath(path))
-        self.controller.reconstruct(data = hologram)
-    
-    @error_aware('Fourier mask could not be loaded')
-    @QtCore.pyqtSlot()
-    def load_fourier_mask(self):
-        """ Load a user-defined reconstruction Fourier mask """
-        fourier_mask_dialog = FourierMaskDialog(initial_mask = self.controller.fourier_mask)
-        fourier_mask_dialog.fourier_mask_update_signal.connect(self.controller.set_fourier_mask)
-        success = fourier_mask_dialog.exec_()
     
     @error_aware('Time-series could not be loaded.')
     @QtCore.pyqtSlot()
@@ -178,22 +182,13 @@ class App(QtGui.QMainWindow):
         time_series_reconstruction = TimeSeriesReconstructionDialog(parent = self)
         time_series_reconstruction.time_series_reconstructed.connect(self.controller.load_time_series)
         success = time_series_reconstruction.exec_()
-    
-    @error_aware('Raw data could not be saved.')
-    @QtCore.pyqtSlot()
-    def save_raw_data(self):
-        """ Save a raw hologram from the raw data screen """
-        path = self.file_dialog.getSaveFileName(self, 'Save holographic data', filter = '*tif')
-        if not path.endswith('.tif'):
-            path = path + '.tif'
-        self.save_latest_hologram_signal.emit(path)
-    
+        
     def closeEvent(self, event):
         reply = QtGui.QMessageBox.question(self, 'SHAMPOO', 'Are you sure you want to quit?', 
                                            QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
-
         if reply == QtGui.QMessageBox.Yes:
             event.accept()
+            self._controller_thread.quit()
         else:
             event.ignore()
     
