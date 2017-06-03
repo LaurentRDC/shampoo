@@ -56,7 +56,7 @@ class TimeSeriesReconstructionDialog(QtGui.QDialog):
         self.time_series = TimeSeries(name = path, mode = 'r+')
 
         # Fill in the details
-        self.holograms_slider.setRange(0, len(self.time_series.time_points))
+        self.holograms_slider.setRange(0, len(self.time_series.time_points) - 1)
         self.holograms_slider.setEnabled(True)
         self.update_holograms_viewer(index = 0)
     
