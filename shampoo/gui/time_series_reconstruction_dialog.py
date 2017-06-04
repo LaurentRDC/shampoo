@@ -16,6 +16,7 @@ class TimeSeriesReconstructionDialog(QtGui.QDialog):
 
         self.time_series = None
         self._propagation_distances = None
+        self._fourier_mask = None
 
         self.setModal(True)
         self.setWindowTitle('Reconstruct time-series')
@@ -40,6 +41,7 @@ class TimeSeriesReconstructionDialog(QtGui.QDialog):
 
         self.recons_params_widget = ReconstructionParametersWidget(parent = self)
         self.recons_params_widget.propagation_distance_signal.connect(self.update_propagation_distance)
+        self.recons_params_widget.fourier_mask_signal.connect(self.update_fourier_mask)
 
         load_time_series_btn = QtGui.QPushButton('Load time-series', self)
         load_time_series_btn.clicked.connect(self.load_time_series)
@@ -87,12 +89,15 @@ class TimeSeriesReconstructionDialog(QtGui.QDialog):
     
     @QtCore.pyqtSlot(object)
     def update_propagation_distance(self, dist):
-        """ Store the reconstruction parameters """
         self._propagation_distances = dist
+    
+    @QtCore.pyqtSlot(object)
+    def update_fourier_mask(self, mask):
+        self._fourier_mask = mask
     
     @QtCore.pyqtSlot()
     def accept(self):
         self.time_series.batch_reconstruct(propagation_distance = self._propagation_distances, 
-                                           fourier_mask = None, 
+                                           fourier_mask = self._fourier_mask, 
                                            callback = self._reconstruction_update_signal.emit)
         super().accept()
