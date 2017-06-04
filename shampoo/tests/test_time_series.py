@@ -76,7 +76,7 @@ def test_time_series_reconstruct_single_wavelength():
         assert np.allclose(ts_reconw.reconstructed_wave, 
                            archived_reconw.reconstructed_wave)
 
-def test_time_series_reconstruct_three_wavelength():
+def test_time_series_reconstruct_three_wavelength_single_depth():
     name = os.path.join(tempfile.gettempdir(), 'test_time_series.hdf5')
     hologram = Hologram(_example_hologram(), wavelength = [100e-9, 200e-9, 300e-9])
 
@@ -94,6 +94,17 @@ def test_time_series_reconstruct_three_wavelength():
         assert np.allclose(ts_reconw.reconstructed_wave, 
                            archived_reconw.reconstructed_wave)
 
+def test_time_series_reconstruct_three_wavelength_multi_depth():
+    name = os.path.join(tempfile.gettempdir(), 'test_time_series.hdf5')
+    hologram = Hologram(_example_hologram(), wavelength = [100e-9, 200e-9, 300e-9])
+
+    with TimeSeries(name = name, mode = 'w') as time_series:
+        time_series.add_hologram(hologram, time_point = 0)
+        ts_reconw = time_series.reconstruct(time_point = 0,
+                                            propagation_distance = [0.1, 0.2, 0.3]) 
+        assert isinstance(ts_reconw, ReconstructedWave)
+        assert ts_reconv.shape == hologram.hologram.shape + (3, 3)
+
 def test_time_series_batch_reconstruct_single_wavelength():
     name = os.path.join(tempfile.gettempdir(), 'test_time_series.hdf5')
 
@@ -102,7 +113,7 @@ def test_time_series_batch_reconstruct_single_wavelength():
             h = Hologram(_example_hologram())
             time_series.add_hologram(h, time_point = time_point)
         
-        time_series.batch_reconstruct(propagation_distance = [1,3])
+        time_series.batch_reconstruct(propagation_distance = 1)
 
 def test_time_series_batch_reconstruct_three_wavelengths():
     name = os.path.join(tempfile.gettempdir(), 'test_time_series.hdf5')
@@ -112,4 +123,4 @@ def test_time_series_batch_reconstruct_three_wavelengths():
             h = Hologram(_example_hologram(), wavelength = [400e-9, 500e-9, 600e-9])
             time_series.add_hologram(h, time_point = time_point)
         
-        time_series.batch_reconstruct(propagation_distance = [1,3])
+        time_series.batch_reconstruct(propagation_distance = 1)

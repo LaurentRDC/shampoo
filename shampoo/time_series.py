@@ -25,9 +25,9 @@ class TimeSeries(h5py.File):
     wavelengths : tuple of floats
         Wavelengths in nm.
     """
-    _default_ckwargs = {'chunks': True, 
-                        'compression':'lzf', 
-                        'shuffle': True}
+    _default_ckwargs = dict() #{'chunks': True, 
+                       # 'compression':'lzf', 
+                       # 'shuffle': True}
     
     @property
     def time_points(self):
@@ -143,31 +143,25 @@ class TimeSeries(h5py.File):
             and returned to the user. 
         """
         time_point = float(time_point)
-        propagation_distance = np.atleast_1d(propagation_distance)
+        propagation_distance = np.atleast_1d(propagation_distance).tolist()
 
         # TODO: provide an accumulator array for hologram.reconstruct()
         #       so that depths are written to disk on the fly?
-        hologram = self.hologram(time_point)
-        recon_wave = hologram.reconstruct(propagation_distance, 
-                                          fourier_mask = fourier_mask,
-                                          **kwargs)
-
-        if propagation_distance.size == 1:
-            recon_wave = {float(propagation_distance):recon_wave}
+        recon_wave = self.hologram(time_point).reconstruct(propagation_distance, 
+                                                           fourier_mask = fourier_mask,
+                                                           **kwargs)
         
-        gp = self.reconstructed_group.require_group(str(time_point))
-        fg = self.fourier_mask_group.require_group(str(time_point))
+        # TODO: provide support for re-reconstructing again with different parameters
 
-        for dist, wave in recon_wave.items():
-            gp.create_dataset(str(dist), data = wave.reconstructed_wave, 
-                                dtype = np.complex, **self._default_ckwargs)
-            fg.create_dataset(str(dist), data = wave.fourier_mask, 
-                                dtype = np.bool,**self._default_ckwargs)
+        self.reconstructed_group.create_dataset(str(time_point), data = recon_wave.reconstructed_wave, 
+                                                dtype = np.complex, **self._default_ckwargs)
+        self.reconstructed_group[str(time_point)].attrs['propagation_distance'] = propagation_distance
+
+        self.fourier_mask_group.create_dataset(str(time_point), data = recon_wave.fourier_mask, 
+                                               dtype = np.bool,**self._default_ckwargs)
         
         # Return the same thins as Hologram.reconstruct() so that the TimeSeries can be passed
         # to anything that expect a reconstruct() method.
-        if len(propagation_distance) == 1:
-            return recon_wave[float(propagation_distance)]
         return recon_wave
     
     def reconstructed_wave(self, time_point, **kwargs):
@@ -198,18 +192,11 @@ class TimeSeries(h5py.File):
             raise ValueError('Reconstruction at {} is unavailable or reconstruction \
                               was never performed.'.format(time_point))
         
-        recon_wave = dict()
-        for dist in gp[time_point].keys():
-            wave, mask = np.array(gp[time_point][str(dist)]), np.array(fp[time_point][str(dist)])
-            recon_wave[dist] = ReconstructedWave(wave, fourier_mask = mask, wavelength = self.wavelengths)
+        wave = gp[time_point]
+        mask = fp[time_point]
+
+        return ReconstructedWave(gp[time_point], fourier_mask = fp[time_point], wavelength = self.wavelengths)
         
-        # We keep in line with the output of Hologram.reconstruct(); for a single
-        # propagation distance the returned value is a ReconstructedWave, and
-        # a dictionary for multiple propagation distances
-        if len(recon_wave) == 1:    # Only a single proapgation distance
-            return recon_wave[recon_wave.keys()[0]]
-        return recon_wave
-    
     def batch_reconstruct(self, propagation_distance, fourier_mask = None,
                           callback = None, **kwargs):
         """ 

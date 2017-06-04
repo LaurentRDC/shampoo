@@ -45,11 +45,26 @@ def test_reconstruction_multiwavelength():
 
     w = holo.reconstruct(0.2)
     assert np.allclose(wl, holo.wavelength)
-    assert len(wl) == w.reconstructed_wave.shape[2]
+    assert len(wl) == w.reconstructed_wave.shape[3]
 
     # in some rare occations, it has appeared that the
     # reconstructed waves were all NaNs.
     assert np.all(np.isfinite(w.reconstructed_wave))
+
+def test_reconstruction_single_wavelength_multiple_depths():
+    im = _example_hologram()
+    holo = Hologram(im)
+
+    w = holo.reconstruct([0.2, 0.3, 0.4])
+    assert w.reconstructed_wave.shape == ( holo.hologram.shape + (3, 1))   # (X, Y, Z, wavelengths)
+
+def test_reconstruction_multiple_wavelengths_multiple_depths():
+    im = _example_hologram()
+    wl = [450e-9, 550e-9, 650e-9]
+    holo = Hologram(im, wavelength = wl)
+
+    w = holo.reconstruct([0.2, 0.3])
+    assert w.reconstructed_wave.shape == ( holo.hologram.shape + (2, len(wl)))   # (X, Y, Z, wavelengths)
 
 def _gaussian2d(amplitude, width, centroid, dim):
     x, y = np.mgrid[0:dim, 0:dim]

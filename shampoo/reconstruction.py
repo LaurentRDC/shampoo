@@ -17,7 +17,7 @@ from collections import Sized, deque, defaultdict
 
 import warnings
 
-from multiprocessing.dummy import Pool as ThreadPool
+from multiprocessing import Pool 
 from functools import partial
 
 from .vis import save_scaled_image
@@ -344,10 +344,8 @@ class Hologram(object):
 
         Returns
         -------
-        reconstructed : ReconstructedWave or iterable
-            For a single propagation distance, the output is a ReconstructedWave. For multiple
-            propagation distances, `reconstructed` is a dictionary whose keys are propagation distances,
-            and each value is a ReconstructedWave object
+        reconstructed : ReconstructedWave
+            Container object for the reconstructed wave.
         """
 
         propagation_distance = np.atleast_1d(propagation_distance)
@@ -368,12 +366,12 @@ class Hologram(object):
             warnings.warn(message, MaskSizeWarning)
         
         if propagation_distance.size > 1:
-            reconstructed_wave = self._reconstruct_multithread(propagation_distance, fourier_mask = fourier_mask)
+            wave =  self._reconstruct_multithread(propagation_distance, fourier_mask = fourier_mask)
         else:
-            reconstructed_wave = self._reconstruct(propagation_distance, fourier_mask)
+            wave = self._reconstruct(propagation_distance, fourier_mask)
+            wave = np.expand_dims(wave, axis = 2)   # single prop. distance will have the wrong shape
         
-        return reconstructed_wave
-        
+        return ReconstructedWave(wave, fourier_mask = fourier_mask, wavelength = self.wavelength)
 
     def _reconstruct(self, propagation_distance, fourier_mask=None):
         """
@@ -391,11 +389,9 @@ class Hologram(object):
 
         Returns
         -------
-        reconstructed_wave : `~shampoo.reconstruction.ReconstructedWave`
-            The reconstructed wave.
+        reconstructed_wave : `~numpy.ndarray` ndim 3
+            The reconstructed wave as an array of dimensions (X, Y, wavelengths)
         """
-        start = time.time()
-        
         x_peak, y_peak = self.spectral_peak
         
         # Calculate mask radius. TODO: Update 250 to an automated guess based on input values.
@@ -413,13 +409,10 @@ class Hologram(object):
         else:
             mask = np.asarray(fourier_mask, dtype=np.bool)
         mask = np.atleast_3d(mask)
-        
-        mask_time = time.time()
 
         # Calculate Fourier transform of impulse response function
         G = self.fourier_trans_of_impulse_resp_func(np.atleast_1d([propagation_distance]*
                                 self.wavelength.size).reshape((1,1,-1))-self.chromatic_shift)
-        transfer = time.time()
         
         # Now calculate digital phase mask. First center the spectral peak for each channel
         x_peak, y_peak = x_peak.reshape(-1), y_peak.reshape(-1)
@@ -429,11 +422,11 @@ class Hologram(object):
                                                         [-x_peak[channel], 
                                                          -y_peak[channel]],
                                                         axes = (0,1))
-        arrshifts = time.time()
+        
         # Apodize the result
         psi = self.apodize(shifted_ft_hologram * G)
         digital_phase_mask = self.get_digital_phase_mask(psi)
-        phase_mask = time.time()
+
         # Reconstruct the image
         # fftshift is independent of channel
         psi = np.empty_like(np.atleast_3d(shifted_ft_hologram))
@@ -447,9 +440,7 @@ class Hologram(object):
                                         axes = (0,1))
         psi *= G
         
-        reconstructed_wave = fftshift(ifft2(psi, axes = (0,1)), axes = (0,1))
-        end = time.time()
-        return ReconstructedWave(reconstructed_wave, fourier_mask = mask, wavelength=self.wavelength)
+        return fftshift(ifft2(psi, axes = (0,1)), axes = (0,1))
 
     def get_digital_phase_mask(self, psi):
         """
@@ -618,7 +609,7 @@ class Hologram(object):
         return _find_peak_centroid(np.abs(self.ft_hologram), self.wavelength, gaussian_width)
         
         
-    def _reconstruct_multithread(self, propagation_distances, threads=4, fourier_mask=None):
+    def _reconstruct_multithread(self, propagation_distances, fourier_mask=None):
         """
         Reconstruct phase or intensity for multiple distances, for one hologram.
         Parameters
@@ -632,30 +623,16 @@ class Hologram(object):
             spectral peak. If array_like, the array will be cast to boolean.
         Returns
         -------
-        wave_cube : Dictionary of ReconstructedWave where keys are depth in meters
-        """
-
-        n_z_slices = len(propagation_distances)
-
-        wave_cube = dict()
-
-        def __reconstruct(index):
-            # Reconstruct image, add to data cube
-            # It is simpler to store propagation distances along the last
-            # axis, but axes will be swapped so that wavelength is last.
-            wave = self._reconstruct(propagation_distances[index],
-                                    fourier_mask = fourier_mask)
-            wave_cube.update({propagation_distances[index]: wave})
-            
-        # Make the Pool of workers
-        pool = ThreadPool(threads)
-        pool.map(__reconstruct, range(n_z_slices))
-
-        # close the pool and wait for the work to finish
-        pool.close()
-        pool.join()
-
-        return wave_cube
+        wave_cube : `~numpy.ndarray`, ndim 4
+        """ 
+        cube = np.empty(shape = self.hologram.shape + (self.wavelength.size, len(propagation_distances)),
+                        dtype = np.complex)
+        with Pool(None) as pool:
+            slices = pool.imap( partial(self._reconstruct, fourier_mask = fourier_mask), propagation_distances)
+            for index, recon in enumerate(slices):
+                cube[:,:,:, index] = recon
+        
+        return np.swapaxes(cube, 2, 3)
     
     def update_spectral_peak(self, spectral_peak):
         """
@@ -822,10 +799,10 @@ class ReconstructedWave(object):
         fourier_mask : array_like
             Reconstruction Fourier mask, in 2- or 3- dimensions.
         """
-        self.reconstructed_wave = np.squeeze(reconstructed_wave)
+        self.reconstructed_wave = reconstructed_wave
         self._intensity_image = None
         self._phase_image = None
-        self.fourier_mask = np.squeeze(np.asarray(fourier_mask, dtype = np.bool))
+        self.fourier_mask = np.asarray(fourier_mask, dtype = np.bool)
         self.wavelength = wavelength
         self.random_seed = RANDOM_SEED
     
