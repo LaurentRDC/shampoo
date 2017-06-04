@@ -239,4 +239,4 @@ class TimeSeries(h5py.File):
             self.reconstruct(time_point = time_point, 
                              propagation_distance = propagation_distance,
                              fourier_mask = fourier_mask, **kwargs)
-            callback(int(index / total))
+            callback(int(100*index / total))

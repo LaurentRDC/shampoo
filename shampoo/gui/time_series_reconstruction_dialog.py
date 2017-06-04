@@ -34,10 +34,15 @@ class TimeSeriesReconstructionDialog(QtGui.QDialog):
         labeled_slider.addWidget(self.time_point_label)
         labeled_slider.addWidget(self.holograms_slider)
 
+        progress_label = QtGui.QLabel('<h3>Reconstruction Progress</h3>')
+        progress_label.setAlignment(QtCore.Qt.AlignCenter)
+
         self.reconstruction_progress = QtGui.QProgressBar(parent = self)
         self.reconstruction_progress.setRange(0, 100)
+        self.reconstruction_progress.setValue(0)
+        self.reconstruction_progress.setAlignment(QtCore.Qt.AlignCenter)
         self._reconstruction_update_signal.connect(self.reconstruction_progress.setValue)
-        self.reconstruction_progress.hide()
+        #self.reconstruction_progress.hide()
 
         self.recons_params_widget = ReconstructionParametersWidget(parent = self)
         self.recons_params_widget.propagation_distance_signal.connect(self.update_propagation_distance)
@@ -61,6 +66,8 @@ class TimeSeriesReconstructionDialog(QtGui.QDialog):
         layout.addWidget(self.holograms_viewer)
         layout.addLayout(labeled_slider)
         layout.addWidget(self.recons_params_widget)
+        layout.addWidget(progress_label)
+        layout.addWidget(self.reconstruction_progress)
         layout.addLayout(btns)
         self.setLayout(layout)
 
@@ -69,12 +76,11 @@ class TimeSeriesReconstructionDialog(QtGui.QDialog):
         path = QtGui.QFileDialog.getOpenFileName(self, caption = 'Select an HDF5 hologram time-series',
                                                  filter = '*.hdf5 *.h5')[0]
         
-        if path == '':
+        if not path:
             return
         
         self.time_series = TimeSeries(name = path, mode = 'r+')
 
-        # Fill in the details
         self.holograms_slider.setRange(0, len(self.time_series.time_points) - 1)
         self.holograms_slider.setEnabled(True)
         self.update_holograms_viewer(index = 0)
@@ -100,4 +106,11 @@ class TimeSeriesReconstructionDialog(QtGui.QDialog):
         self.time_series.batch_reconstruct(propagation_distance = self._propagation_distances, 
                                            fourier_mask = self._fourier_mask, 
                                            callback = self._reconstruction_update_signal.emit)
+        self.time_series.close()
         super().accept()
+    
+    @QtCore.pyqtSlot()
+    def reject(self):
+        if self.time_series:
+            self.time_series.close()
+        super().reject()
