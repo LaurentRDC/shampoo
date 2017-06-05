@@ -195,7 +195,7 @@ class TimeSeries(h5py.File):
         wave = gp[time_point]
         mask = fp[time_point]
 
-        return ReconstructedWave(gp[time_point], fourier_mask = fp[time_point], 
+        return ReconstructedWave(np.array(gp[time_point]), fourier_mask = np.array(fp[time_point]), 
                                  wavelength = self.wavelengths, depths = gp[time_point].attrs['depths'])
         
     def batch_reconstruct(self, propagation_distance, fourier_mask = None,

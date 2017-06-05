@@ -19,11 +19,9 @@ def _example_hologram(dim=256):
     """
     return 1000*np.ones((dim, dim)) + np.random.randn(dim, dim)
 
-
 def test_load_hologram():
     holo = Hologram(_example_hologram())
     assert holo is not None
-
 
 def test_rebin_image():
     dim = 2048
@@ -107,6 +105,20 @@ def test_crop_image():
     cropped_image2 = _crop_image(image2, 0.5)
     assert new_shape2 == cropped_image2.shape
 
+def test_phase_unwrapping_single_wavelength():
+    im = _example_hologram()
+    holo = Hologram(im)
+
+    w = holo.reconstruct([0.2, 0.3, 0.4])
+    assert w.reconstructed_wave.shape == w.phase.shape + (1,)
+
+def test_phase_unwrapping_multi_wavelength():
+    im = _example_hologram()
+    wl = [450e-9, 550e-9, 650e-9]
+    holo = Hologram(im, wavelength = wl)
+
+    w = holo.reconstruct([0.2, 0.3])
+    assert w.reconstructed_wave.shape == w.phase.shape
 
 def test_multiple_reconstructions():
     """

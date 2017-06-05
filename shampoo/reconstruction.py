@@ -371,6 +371,7 @@ class Hologram(object):
             wave = self._reconstruct(propagation_distance, fourier_mask)
             wave = np.expand_dims(wave, axis = 2)   # single prop. distance will have the wrong shape
         
+        # TODO: unwrap phase here
         return ReconstructedWave(reconstructed_wave = wave, fourier_mask = fourier_mask, 
                                  wavelength = self.wavelength, depths = propagation_distance)
 
@@ -676,7 +677,7 @@ class Hologram(object):
 
 def unwrap_phase(reconstructed_wave, wavelength=None):
     if wavelength is not None and wavelength.size == 3:
-        return _unwrap_phase_multiwavelength(reconstructed_wave, wavelength)
+        return _unwrap_phase_multiwavelength(reconstructed_wave, wavelength.reshape(-1))
     else:
         return _unwrap_phase(reconstructed_wave)
 
@@ -696,7 +697,7 @@ def _unwrap_phase(reconstructed_wave, seed=RANDOM_SEED):
     `~numpy.ndarray`
         Unwrapped phase image
     """   
-    phase = np.squeeze(2 * np.arctan(reconstructed_wave.imag / reconstructed_wave.real))
+    phase = 2 * np.arctan(reconstructed_wave.imag / reconstructed_wave.real)
     
     # No channel, no need for shenanigans
     if phase.ndim < 3:
@@ -729,23 +730,25 @@ def _unwrap_phase_multiwavelength(reconstructed_wave, wavelength):
     """
     
     # TODO: Add 2-wavelength phase unwrapping.
-    
-    if reconstructed_wave.shape[2] != 3:
-        message = ("_unwrap_phase_multiwavelength only works with 3-wavelength holograms.")
-        raise SizeError(message)
+
+    # Due to previous implementation
+    # We must have the dimensions be (X,Y, wavelengths, Z) in this function
+    reconstructed_wave = np.swapaxes(reconstructed_wave, 2, 3)
     
     # Get the phase maps 
     # np.arctan2 returns in the range (-pi,pi) so we shift to (0, 2*pi)
     phase = np.squeeze(np.arctan2(reconstructed_wave.imag, reconstructed_wave.real) + np.pi)
 
     # Get the beat wavelengths
-    lambda_13 = wavelength[:,:,0]*wavelength[:,:,2]/np.abs(wavelength[:,:,0]-wavelength[:,:,2])
-    lambda_23 = wavelength[:,:,1]*wavelength[:,:,2]/np.abs(wavelength[:,:,1]-wavelength[:,:,2])
+    w1,w2,w3 = tuple(wavelength)
+
+    lambda_13 = w1*w3/np.abs(w1-w3)
+    lambda_23 =w1*w2/np.abs(w1-w2)
     lambda_1323 = lambda_13*lambda_23/np.abs(lambda_13-lambda_23)
 
     # Get the coarse maps
-    coarse_13 = phase[:,:,0]-phase[:,:,2]
-    coarse_23 = phase[:,:,1]-phase[:,:,2]
+    coarse_13 = phase[:,:,0,:]-phase[:,:,2,:]
+    coarse_23 = phase[:,:,1,:]-phase[:,:,2,:]
     coarse_13[coarse_13<0] = coarse_13[coarse_13<0] + 2*np.pi
     coarse_23[coarse_23<0] = coarse_23[coarse_23<0] + 2*np.pi
     coarse_1323 = coarse_13 - coarse_23
@@ -765,12 +768,12 @@ def _unwrap_phase_multiwavelength(reconstructed_wave, wavelength):
     z_d[z_c[:] < -lambda_13/2] = z_c[z_c[:] < -lambda_13/2] - lambda_13.reshape(-1)
 
     # Get surface profiles for individual wavelength
-    z = wavelength*phase/(2*np.pi)
+    z = np.expand_dims(wavelength, axis = 3)*phase/(2*np.pi)
     #for channel in range(z.shape[2]):
     #    z[:,:,channel] = wavelength[:,:,channel]*phase[:,:,channel]/(2*np.pi)
     z_e = np.empty_like(z)
     for channel in range(z_e.shape[2]):
-        z_e[:,:,channel] = np.rint(z_d/wavelength[:,:,channel])*wavelength[:,:,channel]
+        z_e[:,:,channel] = np.rint(z_d/wavelength[channel])*wavelength[channel]
     z_f = z_e+z
     z_g = np.empty_like(z_f)
     for channel in range(z_g.shape[2]):
@@ -778,11 +781,11 @@ def _unwrap_phase_multiwavelength(reconstructed_wave, wavelength):
     for channel in range(z_g.shape[2]):
         z_f_curr = z_f[:,:,channel]
         z_g_curr = z_g[:,:,channel]
-        z_g_curr[z_f_curr[:] > wavelength[:,:,channel]/2] = z_f_curr[z_f_curr[:] > wavelength[:,:,channel]/2] + wavelength[:,:,channel].reshape(-1)
-        z_g_curr[z_f_curr[:] < -wavelength[:,:,channel]/2] = z_f_curr[z_f_curr[:] < -wavelength[:,:,channel]/2] - wavelength[:,:,channel].reshape(-1)
+        z_g_curr[z_f_curr[:] > wavelength[channel]/2] = z_f_curr[z_f_curr[:] > wavelength[channel]/2] + wavelength[channel]
+        z_g_curr[z_f_curr[:] < -wavelength[channel]/2] = z_f_curr[z_f_curr[:] < -wavelength[channel]/2] - wavelength[channel]
         z_g[:,:,channel] = z_g_curr
 
-    return z_g*2*np.pi/wavelength
+    return np.swapaxes(z_g*2*np.pi/np.expand_dims(wavelength, axis = 3), 2, 3)    # Back to (X, Y, Z, wavelengths)
 
 
 class ReconstructedWave(object):

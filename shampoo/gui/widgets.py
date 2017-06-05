@@ -113,11 +113,13 @@ class ReconstructedHologramViewer(QtGui.QWidget):
         ----------
         reconstructed : ReconstructedWave
         """
-        fourier_mask = reconstructed.fourier_mask
+        axes = {0: 'x', 1:'y', 2:'t', 3:'c'}
 
-        self.amplitude_viewer.setImage(img = reconstructed.intensity)
-        self.phase_viewer.setImage(img = np.nan_to_num(reconstructed.phase))
-        self.fourier_mask_viewer.setImage(img = fourier_mask)
+        fourier_mask, depths = reconstructed.fourier_mask, reconstructed.depths
+
+        self.amplitude_viewer.setImage(img = reconstructed.intensity, xvals = reconstructed.depths)
+        self.phase_viewer.setImage(img = np.nan_to_num(reconstructed.phase), xvals = reconstructed.depths)
+        #self.fourier_mask_viewer.setImage(img = fourier_mask)    #TODO: depths?
         
     @QtCore.pyqtSlot()
     def clear(self):
