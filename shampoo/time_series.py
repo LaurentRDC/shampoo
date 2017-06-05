@@ -155,7 +155,7 @@ class TimeSeries(h5py.File):
 
         self.reconstructed_group.create_dataset(str(time_point), data = recon_wave.reconstructed_wave, 
                                                 dtype = np.complex, **self._default_ckwargs)
-        self.reconstructed_group[str(time_point)].attrs['propagation_distance'] = propagation_distance
+        self.reconstructed_group[str(time_point)].attrs['depths'] = propagation_distance
 
         self.fourier_mask_group.create_dataset(str(time_point), data = recon_wave.fourier_mask, 
                                                dtype = np.bool,**self._default_ckwargs)
@@ -195,7 +195,8 @@ class TimeSeries(h5py.File):
         wave = gp[time_point]
         mask = fp[time_point]
 
-        return ReconstructedWave(gp[time_point], fourier_mask = fp[time_point], wavelength = self.wavelengths)
+        return ReconstructedWave(gp[time_point], fourier_mask = fp[time_point], 
+                                 wavelength = self.wavelengths, depths = gp[time_point].attrs['depths'])
         
     def batch_reconstruct(self, propagation_distance, fourier_mask = None,
                           callback = None, **kwargs):

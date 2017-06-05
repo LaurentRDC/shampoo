@@ -103,7 +103,7 @@ def test_time_series_reconstruct_three_wavelength_multi_depth():
         ts_reconw = time_series.reconstruct(time_point = 0,
                                             propagation_distance = [0.1, 0.2, 0.3]) 
         assert isinstance(ts_reconw, ReconstructedWave)
-        assert ts_reconv.shape == hologram.hologram.shape + (3, 3)
+        assert ts_reconw.reconstructed_wave.shape == hologram.hologram.shape + (3, 3)
 
 def test_time_series_batch_reconstruct_single_wavelength():
     name = os.path.join(tempfile.gettempdir(), 'test_time_series.hdf5')

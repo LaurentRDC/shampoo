@@ -371,7 +371,8 @@ class Hologram(object):
             wave = self._reconstruct(propagation_distance, fourier_mask)
             wave = np.expand_dims(wave, axis = 2)   # single prop. distance will have the wrong shape
         
-        return ReconstructedWave(wave, fourier_mask = fourier_mask, wavelength = self.wavelength)
+        return ReconstructedWave(reconstructed_wave = wave, fourier_mask = fourier_mask, 
+                                 wavelength = self.wavelength, depths = propagation_distance)
 
     def _reconstruct(self, propagation_distance, fourier_mask=None):
         """
@@ -628,10 +629,9 @@ class Hologram(object):
         cube = np.empty(shape = self.hologram.shape + (self.wavelength.size, len(propagation_distances)),
                         dtype = np.complex)
         with Pool(None) as pool:
-            slices = pool.imap( partial(self._reconstruct, fourier_mask = fourier_mask), propagation_distances)
-            for index, recon in enumerate(slices):
-                cube[:,:,:, index] = recon
+            slices = pool.map( partial(self._reconstruct, fourier_mask = fourier_mask), propagation_distances)
         
+        cube = np.stack(slices, axis = 3)        
         return np.swapaxes(cube, 2, 3)
     
     def update_spectral_peak(self, spectral_peak):
@@ -790,7 +790,7 @@ class ReconstructedWave(object):
     Container for reconstructed waves and their intensity and phase
     arrays.
     """
-    def __init__(self, reconstructed_wave, fourier_mask, wavelength):
+    def __init__(self, reconstructed_wave, fourier_mask, wavelength, depths):
         """
         Parameters
         ----------
@@ -798,12 +798,18 @@ class ReconstructedWave(object):
             Reconstructed wave. Last axis is wavelength channel. 
         fourier_mask : array_like
             Reconstruction Fourier mask, in 2- or 3- dimensions.
+        wavelength : float or array_like
+            Wavelength(s) of the reconstructed wave.
+        depths : array_like
+            Reconstruction depths, corresponding to each slice of `reconstructed_wave` along
+            axis 2.
         """
         self.reconstructed_wave = reconstructed_wave
+        self.depths = np.atleast_1d(depths)
         self._intensity_image = None
         self._phase_image = None
         self.fourier_mask = np.asarray(fourier_mask, dtype = np.bool)
-        self.wavelength = wavelength
+        self.wavelength = np.atleast_1d(wavelength)
         self.random_seed = RANDOM_SEED
     
     @property
