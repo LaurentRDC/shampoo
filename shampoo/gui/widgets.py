@@ -113,12 +113,13 @@ class ReconstructedHologramViewer(QtGui.QWidget):
         ----------
         reconstructed : ReconstructedWave
         """
-        axes = {0: 'x', 1:'y', 2:'t', 3:'c'}
+        # By swapping axes, we don't have to specify the axis order
+        #axes = {0: 'x', 1:'y', 2:'t', 3:'c'}
 
         fourier_mask, depths = reconstructed.fourier_mask, reconstructed.depths
 
-        self.amplitude_viewer.setImage(img = reconstructed.intensity, xvals = reconstructed.depths)
-        self.phase_viewer.setImage(img = np.nan_to_num(reconstructed.phase), xvals = reconstructed.depths)
+        self.amplitude_viewer.setImage(img = np.swapaxes(reconstructed.intensity, 0, 2), xvals = reconstructed.depths)
+        self.phase_viewer.setImage(img = np.swapaxes(np.nan_to_num(reconstructed.phase), 0, 2), xvals = reconstructed.depths)
         #self.fourier_mask_viewer.setImage(img = fourier_mask)    #TODO: depths?
         
     @QtCore.pyqtSlot()
