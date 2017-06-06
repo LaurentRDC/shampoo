@@ -10,6 +10,8 @@ class TimeSeriesCreator(QtGui.QDialog):
     time_series_path_signal = QtCore.pyqtSignal(str)
     _assembly_update_signal = QtCore.pyqtSignal(int)
 
+    time_series_assembly = QtCore.pyqtSignal(dict)
+
     def __init__(self, **kwargs):
         self.holograms = list()
 
@@ -24,8 +26,11 @@ class TimeSeriesCreator(QtGui.QDialog):
         
         self.assembly_progress_bar = QtGui.QProgressBar(parent = self)
         self.assembly_progress_bar.setRange(0, 100)
+        self.assembly_progress_bar.setValue(0)
         self._assembly_update_signal.connect(self.assembly_progress_bar.setValue)
-        self.assembly_progress_bar.hide()
+
+        progress_label = QtGui.QLabel('<h3>Assembly Progress</h3>')
+        progress_label.setAlignment(QtCore.Qt.AlignCenter)
 
         # Wavelength widgets as spinboxes
         # wavelength 2 and 3 are hidden with a default of None
@@ -101,6 +106,7 @@ class TimeSeriesCreator(QtGui.QDialog):
         layout.addWidget(self.hologram_table)
         layout.addLayout(wavelength_mode_layout)
         layout.addLayout(wavelength_layout)
+        layout.addWidget(progress_label)
         layout.addWidget(self.assembly_progress_bar)
         layout.addLayout(btns)
         self.setLayout(layout)
@@ -142,12 +148,11 @@ class TimeSeriesCreator(QtGui.QDialog):
         
     @QtCore.pyqtSlot()
     def accept(self):
-
+        assembly_params = dict()
         filename = QtGui.QFileDialog.getSaveFileName(self, caption = 'Save time series', 
                                                    filter = "HDF5 (*.hdf5 *.h5)")[0]
-
-        self.assembly_progress_bar.show()
-        self._assembly_update_signal.emit(0)
+        if not filename:
+            return
 
         # Determine the number of wavelengths
         # wavelengths of value 0 are not counted.
@@ -157,15 +162,13 @@ class TimeSeriesCreator(QtGui.QDialog):
             if v != 0:
                 wavelengths.append(v*1e-9)  # widgets show nm, we want meters
 
-        t = TimeSeries(name = filename, mode = 'w')
-        for index, path in enumerate(self.holograms):
-            # TODO: choose time-points instead of index
-            holo = Hologram.from_tif(path, wavelength = wavelengths)
-            t.add_hologram(holo, time_point = index)
-            self._assembly_update_signal.emit(int(100*index / len(self.holograms)))
-        self._assembly_update_signal.emit(100)
-        
-        self.time_series_path_signal.emit(filename)
-        self.assembly_progress_bar.hide()
+        assembly_params['filename'] = filename
+        assembly_params['callback'] = self._assembly_update_signal.emit
+        assembly_params['wavelengths'] = wavelengths
+        assembly_params['hologram_paths'] = list(self.holograms)
 
-        super(TimeSeriesCreator, self).accept()
+        # NOTE: even though the arguments for super() are not required in python 3, they are required
+        #       when emitting this dictionary away
+        assembly_params['final_callback'] = lambda : super(TimeSeriesCreator, self).accept()
+
+        self.time_series_assembly.emit(assembly_params)

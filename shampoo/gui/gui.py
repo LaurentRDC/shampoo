@@ -65,6 +65,31 @@ class ShampooController(QtCore.QObject):
 
         self.data_from_time_series(metadata['time_points'][0])
     
+    @QtCore.pyqtSlot(dict)
+    def assemble_time_series(self, params):
+        """ Assemble a TimeSeries object from parameters """
+        wavelengths = params['wavelengths']
+        callback = params['callback']
+        done = params['final_callback']
+        total = len(params['hologram_paths'])
+
+        callback(0)
+        with TimeSeries(name = params['filename'], mode = 'w') as t:
+            for index, path in enumerate(params['hologram_paths']):
+                # TODO: choose time-points instead of index
+                holo = Hologram.from_tif(path, wavelength = wavelengths)
+                t.add_hologram(holo, time_point = index)
+                callback(int(100*index / total))
+        callback(100); done();
+        self.load_time_series(params['filename'])
+    
+    @QtCore.pyqtSlot(dict)
+    def reconstruct_time_series(self, params):
+        done = params.pop('final_callback')
+        self.time_series.batch_reconstruct(**params)
+        done()
+        self.data_from_time_series(self.time_series.time_points[0])
+    
     @QtCore.pyqtSlot(float)
     def data_from_time_series(self, time_point):
         """ Display raw data and reconstruction from TimeSeries """
@@ -173,14 +198,14 @@ class App(QtGui.QMainWindow):
     @QtCore.pyqtSlot()
     def launch_time_series_creator(self):
         time_series_creator = TimeSeriesCreator(parent = self)
-        time_series_creator.time_series_path_signal.connect(self.controller.load_time_series)
+        time_series_creator.time_series_assembly.connect(self.controller.assemble_time_series)
         success = time_series_creator.exec_()
     
     @error_aware('The hologram time-series could not be reconstructed.')
     @QtCore.pyqtSlot()
     def launch_time_series_reconstruction(self):
         time_series_reconstruction = TimeSeriesReconstructionDialog(parent = self)
-        time_series_reconstruction.time_series_reconstructed.connect(self.controller.load_time_series)
+        time_series_reconstruction.reconstruction_parameters.connect(self.controller.reconstruct_time_series)
         success = time_series_reconstruction.exec_()
         
     def closeEvent(self, event):
