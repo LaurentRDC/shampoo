@@ -35,6 +35,7 @@ class ShampooController(QtCore.QObject):
     """
     Underlying controller to SHAMPOO's Graphical User Interface
     """
+    time_series_loaded = QtCore.pyqtSignal(bool)
     raw_data_signal = QtCore.pyqtSignal(object)
     reconstructed_hologram_signal = QtCore.pyqtSignal(object)
     time_series_metadata_signal = QtCore.pyqtSignal(dict)
@@ -43,6 +44,8 @@ class ShampooController(QtCore.QObject):
     def __init__(self, **kwargs):
         super(ShampooController, self).__init__(**kwargs)
         self.time_series = None
+
+        self.time_series_loaded.emit(False)
     
     @QtCore.pyqtSlot(str)
     @error_aware('Time-series could not be loaded')
@@ -64,6 +67,14 @@ class ShampooController(QtCore.QObject):
         self.time_series_metadata_signal.emit(metadata)
 
         self.data_from_time_series(metadata['time_points'][0])
+        self.time_series_loaded.emit(True)
+    
+    @QtCore.pyqtSlot()
+    def close_time_series(self):
+        try: self.time_series.close()
+        except: pass
+        
+        self.time_series_loaded.emit(False)
     
     @QtCore.pyqtSlot(dict)
     def assemble_time_series(self, params):
@@ -179,14 +190,20 @@ class App(QtGui.QMainWindow):
         self.load_time_series_action.triggered.connect(self.load_time_series)
         self.file_menu.addAction(self.load_time_series_action)
 
+        self.close_time_series_action = QtGui.QAction('&Close time-series', self)
+        self.close_time_series_action.triggered.connect(self.controller.close_time_series)
+        self.controller.time_series_loaded.connect(self.close_time_series_action.setEnabled)
+        self.file_menu.addAction(self.close_time_series_action)
+
         self.file_menu.addSeparator()
 
-        self.time_series_creator_action = QtGui.QAction('&Create hologram times-eries', self)
+        self.time_series_creator_action = QtGui.QAction('&Create hologram times-series', self)
         self.time_series_creator_action.triggered.connect(self.launch_time_series_creator)
         self.file_menu.addAction(self.time_series_creator_action)
 
         self.time_series_reconstruct_action = QtGui.QAction('&Reconstruct a hologram time-series', self)
         self.time_series_reconstruct_action.triggered.connect(self.launch_time_series_reconstruction)
+        self.controller.time_series_loaded.connect(self.time_series_reconstruct_action.setEnabled)
         self.file_menu.addAction(self.time_series_reconstruct_action)
     
     @error_aware('Time-series could not be loaded.')
