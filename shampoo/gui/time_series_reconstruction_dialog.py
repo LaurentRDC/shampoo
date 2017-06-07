@@ -7,12 +7,16 @@ from .. import TimeSeries
 
 class TimeSeriesReconstructionDialog(QtGui.QDialog):
 
-    time_series_reconstructed = QtCore.pyqtSignal(str)
-    time_series_loaded = QtCore.pyqtSignal(object)
     reconstruction_parameters = QtCore.pyqtSignal(dict)
     _reconstruction_update_signal = QtCore.pyqtSignal(int)
 
-    def __init__(self, **kwargs):
+    def __init__(self, nwavelengths, **kwargs):
+        """
+        Parameters
+        ----------
+        nwavelengths : int, {1, 3}
+            Single or three-wavelength mode
+        """
         super(TimeSeriesReconstructionDialog, self).__init__(**kwargs)
 
         self._propagation_distances = None
@@ -30,9 +34,10 @@ class TimeSeriesReconstructionDialog(QtGui.QDialog):
         self.reconstruction_progress.setAlignment(QtCore.Qt.AlignCenter)
         self._reconstruction_update_signal.connect(self.reconstruction_progress.setValue)
 
-        self.recons_params_widget = ReconstructionParametersWidget(parent = self)
+        self.recons_params_widget = ReconstructionParametersWidget(parent = self, nwavelengths = nwavelengths)
         self.recons_params_widget.propagation_distance_signal.connect(self.update_propagation_distance)
         self.recons_params_widget.fourier_mask_signal.connect(self.update_fourier_mask)
+        self.recons_params_widget.chromatic_shift_signal.connect(self.update_chromatic_shift)
 
         accept_btn = QtGui.QPushButton('Reconstruct time-series', self)
         accept_btn.clicked.connect(self.accept)
@@ -59,10 +64,15 @@ class TimeSeriesReconstructionDialog(QtGui.QDialog):
     def update_fourier_mask(self, mask):
         self._fourier_mask = mask
     
+    @QtCore.pyqtSlot(tuple)
+    def update_chromatic_shift(self, shifts):
+        self._chromatic_shifts = shifts
+    
     @QtCore.pyqtSlot()
     def accept(self):
         recon_params = {'propagation_distance': self._propagation_distances,
                         'fourier_mask': self._fourier_mask,
+                        'chromatic_shift': self._chromatic_shifts,
                         'callback': self._reconstruction_update_signal.emit,
                         'final_callback': lambda: super(TimeSeriesReconstructionDialog, self).accept()}
         self.reconstruction_parameters.emit(recon_params)

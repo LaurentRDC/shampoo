@@ -69,15 +69,16 @@ class ShampooController(QtCore.QObject):
     def assemble_time_series(self, params):
         """ Assemble a TimeSeries object from parameters """
         wavelengths = params['wavelengths']
-        callback = params['callback']
-        done = params['final_callback']
+        chromatic_shifts = params['chromatic_shift']
+        callback = params.pop('callback')
+        done = params.pop('final_callback')
         total = len(params['hologram_paths'])
 
         callback(0)
         with TimeSeries(name = params['filename'], mode = 'w') as t:
             for index, path in enumerate(params['hologram_paths']):
                 # TODO: choose time-points instead of index
-                holo = Hologram.from_tif(path, wavelength = wavelengths)
+                holo = Hologram.from_tif(path, wavelength = wavelengths, chromatic_shift = chromatic_shifts)
                 t.add_hologram(holo, time_point = index)
                 callback(int(100*index / total))
         callback(100); done();
@@ -204,7 +205,12 @@ class App(QtGui.QMainWindow):
     @error_aware('The hologram time-series could not be reconstructed.')
     @QtCore.pyqtSlot()
     def launch_time_series_reconstruction(self):
-        time_series_reconstruction = TimeSeriesReconstructionDialog(parent = self)
+        try:
+            nwavelengths = len(self.controller.time_series.wavelengths)
+        except:
+            nwavelengths = 1
+
+        time_series_reconstruction = TimeSeriesReconstructionDialog(parent = self, nwavelengths = nwavelengths)
         time_series_reconstruction.reconstruction_parameters.connect(self.controller.reconstruct_time_series)
         success = time_series_reconstruction.exec_()
         

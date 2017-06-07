@@ -13,14 +13,25 @@ class ReconstructionParametersWidget(QtGui.QWidget):
 
     propagation_distance_signal = QtCore.pyqtSignal(object)
     fourier_mask_signal = QtCore.pyqtSignal(object)
+    chromatic_shift_signal = QtCore.pyqtSignal(tuple)
 
     _fourier_mask_path_signal = QtCore.pyqtSignal(str)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, nwavelengths, *args, **kwargs):
+        """
+        Parameters
+        ----------
+        nwavelengths : int, {1, 3}
+            Single or three-wavelength mode
+        """
+        if not nwavelengths in set([1, 3]):
+            raise ValueError('Only single- and three-wavelengths reconstructions are available.')
+
         super(ReconstructionParametersWidget, self).__init__(*args, **kwargs)
+
+        self.nwavelengths = nwavelengths
         
         self.prop_dist_start_widget = QtGui.QDoubleSpinBox(parent = self)
-        self.prop_dist_start_widget.setValue(DEFAULT_PROPAGATION_DISTANCE)
         self.prop_dist_stop_widget = QtGui.QDoubleSpinBox(parent = self)
         self.prop_dist_step_widget = QtGui.QDoubleSpinBox(parent = self)
 
@@ -36,10 +47,11 @@ class ReconstructionParametersWidget(QtGui.QWidget):
                        self.prop_dist_step_widget):
             widget.setSuffix(' m')
             widget.setRange(0.0, 1.0)
-            widget.setSingleStep(10^-(widget.decimals()))
             widget.setDecimals(5)
+            widget.setSingleStep(1e-5)
             widget.editingFinished.connect(self.update_propagation_distance)
         
+        self.prop_dist_start_widget.setValue(DEFAULT_PROPAGATION_DISTANCE)
         self.set_multi_dist_mode(mode = 0)  # Initialize to single-propagation distance
         
         # Button group for single or multiple propagation distances
@@ -71,6 +83,30 @@ class ReconstructionParametersWidget(QtGui.QWidget):
         propagation_distances_label = QtGui.QLabel('<h3>Numerical Propagation Distance(s)</h3>')
         propagation_distances_label.setAlignment(QtCore.Qt.AlignCenter)
 
+        self.chromshift1_widget = QtGui.QDoubleSpinBox(parent = self)
+        self.chromshift2_widget = QtGui.QDoubleSpinBox(parent = self)
+        self.chromshift3_widget = QtGui.QDoubleSpinBox(parent = self)
+
+        for widget in (self.chromshift1_widget, self.chromshift2_widget, self.chromshift3_widget):
+            widget.setSuffix(' m')
+            widget.setRange(-1.0, 1.0)
+            widget.setSingleStep(1e-6)
+            widget.setDecimals(6)
+            widget.setValue(0.0)
+            widget.valueChanged.connect(self.update_chromatic_shift)
+        
+        chromshift_layout = QtGui.QHBoxLayout()
+        chromshift_layout.addWidget(self.chromshift1_widget)
+        chromshift_layout.addWidget(self.chromshift2_widget)
+        chromshift_layout.addWidget(self.chromshift3_widget)
+
+        if self.nwavelengths == 1:
+            self.chromshift2_widget.hide()
+            self.chromshift3_widget.hide()
+
+        chromatic_shifts_label = QtGui.QLabel('<h3>Chromatic Shift(s)</h3>')
+        chromatic_shifts_label.setAlignment(QtCore.Qt.AlignCenter)
+
         self.load_fourier_mask_btn = QtGui.QPushButton('Load Fourier mask', self)
         self.load_fourier_mask_btn.clicked.connect(self.load_fourier_mask)
 
@@ -92,6 +128,8 @@ class ReconstructionParametersWidget(QtGui.QWidget):
         layout.addWidget(propagation_distances_label)
         layout.addLayout(prop_dist_layout)
         layout.addLayout(mode_btns)
+        layout.addWidget(chromatic_shifts_label)
+        layout.addLayout(chromshift_layout)
         layout.addWidget(fourier_mask_label)
         layout.addWidget(self.fourier_mask_path_label)
         layout.addLayout(fourier_mask_btns)
@@ -127,6 +165,15 @@ class ReconstructionParametersWidget(QtGui.QWidget):
     def clear_fourier_mask(self):
         self.fourier_mask_signal.emit(None)
         self._fourier_mask_path_signal.emit('Current Fourier mask: None')
+    
+    @QtCore.pyqtSlot()
+    def update_chromatic_shift(self):
+        if self.nwavelengths == 1:
+            self.chromatic_shift_signal.emit(tuple([self.chromshift1_widget.value()]))
+        else:
+            self.chromatic_shift_signal.emit(tuple([self.chromshift1_widget.value(),
+                                                    self.chromshift2_widget.value(),
+                                                    self.chromshift3_widget.value()]))
     
     @QtCore.pyqtSlot()
     def update_propagation_distance(self):
