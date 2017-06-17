@@ -193,9 +193,8 @@ class App(QtGui.QMainWindow, metaclass = ErrorAware):
         reconstructed_layout = QtGui.QVBoxLayout()
         reconstructed_layout.addWidget(self.reconstructed_viewer)
 
-        self.error_window = QtGui.QErrorMessage(parent = self)
-        self.error_message_signal.connect(self.error_window.showMessage)
-        self.controller.error_message_signal.connect(self.error_window.showMessage)
+        self.error_message_signal.connect(self.show_error_message)
+        self.controller.error_message_signal.connect(self.show_error_message)
 
         self.layout = QtGui.QHBoxLayout()
         self.layout.addLayout(raw_data_layout)
@@ -240,6 +239,11 @@ class App(QtGui.QMainWindow, metaclass = ErrorAware):
         time_series_creator = TimeSeriesCreator(parent = self)
         time_series_creator.time_series_assembly.connect(self.controller.assemble_time_series)
         success = time_series_creator.exec_()
+    
+    @QtCore.pyqtSlot(str)
+    def show_error_message(self, message):
+        error_window = QtGui.QErrorMessage(parent = self)
+        error_window.showMessage(message)
     
     @QtCore.pyqtSlot()
     def launch_time_series_reconstruction(self):
