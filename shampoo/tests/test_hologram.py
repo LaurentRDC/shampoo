@@ -7,6 +7,7 @@ from ..reconstruction import (Hologram, rebin_image, _find_peak_centroid,
 import numpy as np
 np.random.seed(RANDOM_SEED)
 
+import pytest
 
 def _example_hologram(dim=256):
     """
@@ -18,6 +19,11 @@ def _example_hologram(dim=256):
         Dimensions of image. Default is 2048.
     """
     return 1000*np.ones((dim, dim)) + np.random.randn(dim, dim)
+
+def test_non2d_hologram():
+    """ Test that non-2D holograms raise a ValueError on instantiation """
+    with pytest.raises(ValueError) as e_info:
+        holo = Hologram(np.empty((128, 128, 3)))
 
 def test_load_hologram():
     holo = Hologram(_example_hologram())

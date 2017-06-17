@@ -88,10 +88,10 @@ class TimeSeries(h5py.File):
         # that is already stored there. Otherwise, create a new dataset
         gp = self.hologram_group
         if time_point in self.time_points:
-            return gp[str(time_point)].write_direct(np.atleast_3d(hologram.hologram))
+            return gp[str(time_point)].write_direct(hologram.hologram)
         else:
             self.attrs['time_points'] = self.time_points + (time_point, )
-            return gp.create_dataset(str(time_point), data = np.atleast_3d(hologram.hologram), 
+            return gp.create_dataset(str(time_point), data = hologram.hologram, 
                                      dtype = np.uint8, **self._default_ckwargs)
     
     def hologram(self, time_point, **kwargs):

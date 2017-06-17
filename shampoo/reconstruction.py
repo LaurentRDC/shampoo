@@ -148,7 +148,12 @@ def _load_hologram(hologram_path):
     """
     Load a hologram from path ``hologram_path`` using scikit-image and numpy.
     """
-    return np.array(imread(hologram_path), dtype=np.float64)
+    im = np.array(imread(hologram_path), dtype=np.float64)
+    # Some TIF images are saved as 3D arrays (one slice per color)
+    if im.ndim == 3:
+        warnings.warn('Image at {} is not grayscale. Only considering the first slice.'.format(hologram_path), UserWarning)
+        return im[:,:,0]
+    return im
 
 
 def _find_peak_centroid(image, wavelength=405e-9, gaussian_width=10):
@@ -260,8 +265,11 @@ class Hologram(object):
         self.crop_fraction = crop_fraction
         self.rebin_factor = rebin_factor
 
+        hologram = np.asarray(hologram, dtype = np.float)
+        if hologram.ndim != 2:
+            raise ValueError('hologram dimensions ({}) are invalid. Holograms should be 2D image'.format(hologram.shape))
         # Rebin the hologram
-        square_hologram = _crop_to_square(np.float64(hologram))
+        square_hologram = _crop_to_square(hologram)
         binned_hologram = rebin_image(square_hologram, self.rebin_factor)
 
         # Crop the hologram by factor crop_factor, centered on original center
