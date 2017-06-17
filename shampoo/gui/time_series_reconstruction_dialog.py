@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from pyqtgraph import QtGui, QtCore, ImageView
+from pyqtgraph import QtGui, QtCore
 
 from .recon_params_widget import ReconstructionParametersWidget
 from .. import TimeSeries
@@ -21,6 +21,7 @@ class TimeSeriesReconstructionDialog(QtGui.QDialog):
 
         self._propagation_distances = None
         self._fourier_mask = None
+        self._chromatic_shifts = None
 
         self.setModal(True)
         self.setWindowTitle('Reconstruct time-series')

@@ -79,8 +79,7 @@ class ShampooController(QtCore.QObject):
     @QtCore.pyqtSlot(dict)
     def assemble_time_series(self, params):
         """ Assemble a TimeSeries object from parameters """
-        wavelengths = params['wavelengths']
-        chromatic_shifts = params['chromatic_shift']
+        wavelengths = params['wavelengths'] 
         callback = params.pop('callback')
         done = params.pop('final_callback')
         total = len(params['hologram_paths'])
@@ -89,7 +88,7 @@ class ShampooController(QtCore.QObject):
         with TimeSeries(name = params['filename'], mode = 'w') as t:
             for index, path in enumerate(params['hologram_paths']):
                 # TODO: choose time-points instead of index
-                holo = Hologram.from_tif(path, wavelength = wavelengths, chromatic_shift = chromatic_shifts)
+                holo = Hologram.from_tif(path, wavelength = wavelengths)
                 t.add_hologram(holo, time_point = index)
                 callback(int(100*index / total))
         callback(100); done();
