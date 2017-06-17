@@ -4,10 +4,11 @@ Graphical User Interface to the SHAMPOO API.
 from __future__ import absolute_import
 
 from contextlib import suppress
-import functools
+from functools import wraps
 import os.path
 import sys
 import traceback
+from types import FunctionType
 
 import numpy as np
 import pyqtgraph as pg
@@ -15,7 +16,6 @@ from pyqtgraph import QtCore, QtGui
 from skimage import img_as_bool
 from skimage.io import imsave
 
-from . import error_aware
 from ..reconstruction import Hologram, ReconstructedWave
 from ..time_series import TimeSeries
 from .fourier_mask_dialog import FourierMaskDialog
@@ -31,7 +31,33 @@ def run(*args, **kwargs):
     gui = App()
     sys.exit(app.exec_())
 
-class ShampooController(QtCore.QObject):
+def error_aware(func):
+    """
+    Wrap an instance method with a try/except and emit a message.
+    Instance must have a signal called 'error_message_signal' which
+    will be emitted with the message upon error. 
+    """
+    @wraps(func)
+    def aware_func(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except:
+            exc = traceback.format_exc()
+            self.error_message_signal.emit(exc)
+    return aware_func
+
+class ErrorAware(QtCore.pyqtWrapperType):
+    
+    def __new__(meta, classname, bases, class_dict):
+        new_class_dict = dict()
+        for attr_name, attr in class_dict.items():
+            if isinstance(attr, FunctionType):
+                attr = error_aware(attr)
+            new_class_dict[attr_name] = attr
+        
+        return super().__new__(meta, classname, bases, new_class_dict)
+
+class ShampooController(QtCore.QObject, metaclass = ErrorAware):
     """
     Underlying controller to SHAMPOO's Graphical User Interface
     """
@@ -48,7 +74,6 @@ class ShampooController(QtCore.QObject):
         self.time_series_loaded.emit(False)
     
     @QtCore.pyqtSlot(str)
-    @error_aware('Time-series could not be loaded')
     def load_time_series(self, path):
         """
         Load TimeSeries object into the controller
@@ -110,7 +135,7 @@ class ShampooController(QtCore.QObject):
             reconstructed = self.time_series.reconstructed_wave(time_point)
             self.reconstructed_hologram_signal.emit(reconstructed)
 
-class App(QtGui.QMainWindow):
+class App(QtGui.QMainWindow, metaclass = ErrorAware):
     """
     GUI shell to the ShampooController object.
 
@@ -205,20 +230,17 @@ class App(QtGui.QMainWindow):
         self.controller.time_series_loaded.connect(self.time_series_reconstruct_action.setEnabled)
         self.file_menu.addAction(self.time_series_reconstruct_action)
     
-    @error_aware('Time-series could not be loaded.')
     @QtCore.pyqtSlot()
     def load_time_series(self):
         path = self.file_dialog.getOpenFileName(self, 'Load time-series', filter = '*hdf5 *.h5')[0]
         self.controller.load_time_series(path)
     
-    @error_aware('The hologram time-series could not be created.')
     @QtCore.pyqtSlot()
     def launch_time_series_creator(self):
         time_series_creator = TimeSeriesCreator(parent = self)
         time_series_creator.time_series_assembly.connect(self.controller.assemble_time_series)
         success = time_series_creator.exec_()
     
-    @error_aware('The hologram time-series could not be reconstructed.')
     @QtCore.pyqtSlot()
     def launch_time_series_reconstruction(self):
         try:
