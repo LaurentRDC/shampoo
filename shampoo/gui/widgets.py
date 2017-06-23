@@ -117,10 +117,10 @@ class ReconstructedHologramViewer(QtGui.QWidget):
         #axes = {0: 'x', 1:'y', 2:'t', 3:'c'}
 
         fourier_mask, depths = reconstructed.fourier_mask, reconstructed.depths
-
+        # TODO: why flip?
         self.amplitude_viewer.setImage(img = np.swapaxes(reconstructed.intensity, 0, 2), xvals = reconstructed.depths)
         self.phase_viewer.setImage(img = np.swapaxes(np.nan_to_num(reconstructed.phase), 0, 2), xvals = reconstructed.depths)
-        #self.fourier_mask_viewer.setImage(img = fourier_mask)    #TODO: depths?
+        self.fourier_mask_viewer.setImage(img = fourier_mask)    #TODO: depths?
         
     @QtCore.pyqtSlot()
     def clear(self):
