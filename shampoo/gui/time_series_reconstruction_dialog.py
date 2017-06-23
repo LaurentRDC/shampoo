@@ -10,15 +10,18 @@ class TimeSeriesReconstructionDialog(QtGui.QDialog):
     reconstruction_parameters = QtCore.pyqtSignal(dict)
     _reconstruction_update_signal = QtCore.pyqtSignal(int)
 
-    def __init__(self, nwavelengths, **kwargs):
+    def __init__(self, nwavelengths, hologram = None, **kwargs):
         """
         Parameters
         ----------
         nwavelengths : int, {1, 3}
             Single or three-wavelength mode
+        hologram : `~numpy.ndarray` or None, optional
+            Image of an hologram
         """
         super(TimeSeriesReconstructionDialog, self).__init__(**kwargs)
 
+        self._hologram = hologram
         self._propagation_distances = None
         self._fourier_mask = None
         self._chromatic_shifts = None
@@ -35,7 +38,7 @@ class TimeSeriesReconstructionDialog(QtGui.QDialog):
         self.reconstruction_progress.setAlignment(QtCore.Qt.AlignCenter)
         self._reconstruction_update_signal.connect(self.reconstruction_progress.setValue)
 
-        self.recons_params_widget = ReconstructionParametersWidget(parent = self, nwavelengths = nwavelengths)
+        self.recons_params_widget = ReconstructionParametersWidget(parent = self, nwavelengths = nwavelengths, hologram = self._hologram)
         self.recons_params_widget.propagation_distance_signal.connect(self.update_propagation_distance)
         self.recons_params_widget.fourier_mask_signal.connect(self.update_fourier_mask)
         self.recons_params_widget.chromatic_shift_signal.connect(self.update_chromatic_shift)

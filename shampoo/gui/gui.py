@@ -232,7 +232,8 @@ class App(QtGui.QMainWindow, metaclass = ErrorAware):
     @QtCore.pyqtSlot()
     def load_time_series(self):
         path = self.file_dialog.getOpenFileName(self, 'Load time-series', filter = '*hdf5 *.h5')[0]
-        self.controller.load_time_series(path)
+        if path:
+            self.controller.load_time_series(path)
     
     @QtCore.pyqtSlot()
     def launch_time_series_creator(self):
@@ -251,8 +252,10 @@ class App(QtGui.QMainWindow, metaclass = ErrorAware):
             nwavelengths = len(self.controller.time_series.wavelengths)
         except:
             nwavelengths = 1
-
-        time_series_reconstruction = TimeSeriesReconstructionDialog(parent = self, nwavelengths = nwavelengths)
+        
+        holo = self.controller.time_series.hologram(time_point = self.controller.time_series.time_points[0])
+        time_series_reconstruction = TimeSeriesReconstructionDialog(parent = self, nwavelengths = nwavelengths, 
+                                                                    hologram = np.array(holo.hologram, copy = True))
         time_series_reconstruction.reconstruction_parameters.connect(self.controller.reconstruct_time_series)
         success = time_series_reconstruction.exec_()
         

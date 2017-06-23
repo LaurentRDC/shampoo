@@ -4,6 +4,8 @@ import numpy as np
 from pyqtgraph import QtGui, QtCore
 from skimage.io import imread
 
+from .fourier_mask_design_dialog import FourierMaskDesignDialog
+
 from ..reconstruction import Hologram
 from ..time_series import TimeSeries
 
@@ -17,12 +19,14 @@ class ReconstructionParametersWidget(QtGui.QWidget):
 
     _fourier_mask_path_signal = QtCore.pyqtSignal(str)
 
-    def __init__(self, nwavelengths, *args, **kwargs):
+    def __init__(self, nwavelengths, hologram = None, *args, **kwargs):
         """
         Parameters
         ----------
         nwavelengths : int, {1, 3}
             Single or three-wavelength mode
+        hologram : `~numpy.ndarray` or None, optional
+            Image of a hologram.
         """
         if not nwavelengths in set([1, 3]):
             raise ValueError('Only single- and three-wavelengths reconstructions are available.')
@@ -30,6 +34,7 @@ class ReconstructionParametersWidget(QtGui.QWidget):
         super(ReconstructionParametersWidget, self).__init__(*args, **kwargs)
 
         self.nwavelengths = nwavelengths
+        self.hologram = hologram
         
         self.prop_dist_start_widget = QtGui.QDoubleSpinBox(parent = self)
         self.prop_dist_stop_widget = QtGui.QDoubleSpinBox(parent = self)
@@ -110,6 +115,9 @@ class ReconstructionParametersWidget(QtGui.QWidget):
         self.load_fourier_mask_btn = QtGui.QPushButton('Load Fourier mask', self)
         self.load_fourier_mask_btn.clicked.connect(self.load_fourier_mask)
 
+        self.design_fourier_mask_btn = QtGui.QPushButton('Design Fourier mask', self)
+        self.design_fourier_mask_btn.clicked.connect(self.design_fourier_mask)
+
         self.clear_fourier_mask_btn = QtGui.QPushButton('Clear Fourier mask', self)
         self.clear_fourier_mask_btn.clicked.connect(self.clear_fourier_mask)
 
@@ -119,6 +127,7 @@ class ReconstructionParametersWidget(QtGui.QWidget):
 
         fourier_mask_btns = QtGui.QHBoxLayout()
         fourier_mask_btns.addWidget(self.load_fourier_mask_btn)
+        fourier_mask_btns.addWidget(self.design_fourier_mask_btn)
         fourier_mask_btns.addWidget(self.clear_fourier_mask_btn)
 
         fourier_mask_label = QtGui.QLabel('<h3>Fourier Mask Controls</h3>')
@@ -160,6 +169,14 @@ class ReconstructionParametersWidget(QtGui.QWidget):
         if path:
             self.fourier_mask_signal.emit(imread(path))
             self._fourier_mask_path_signal.emit('Current Fourier mask: {}'.format(path)) 
+    
+    @QtCore.pyqtSlot()
+    def design_fourier_mask(self):
+        ft = np.fft.fftshift(np.fft.fft2(self.hologram))
+        designer = FourierMaskDesignDialog(parent = self, fourier = np.log(np.abs(ft)**2))
+        designer.fourier_mask.connect(self.fourier_mask_signal)
+        designer.fourier_mask.connect(lambda im: self._fourier_mask_path_signal.emit('User-designed mask'))
+        success = designer.exec_()
     
     @QtCore.pyqtSlot()
     def clear_fourier_mask(self):
